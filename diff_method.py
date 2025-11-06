@@ -127,7 +127,7 @@ def find_preamble_offset(signal_iq, preamble_iq, sps):
     d_sig_list = []
     for phase in range(sps):
         # Берем символы с шагом sps, начиная с фазы phase
-        sig_symbols = signal_iq[phase:len(signal_iq):sps]
+        sig_symbols = signal_iq[phase::sps]
         d_sig = sig_symbols[1:] * np.conj(sig_symbols[:-1])
         d_sig_list.append(d_sig)
     
@@ -168,6 +168,9 @@ if __name__ == "__main__":
 
     # Поиск преамбулы и выравнивание сигнала
     offset, signal_iq, conv_results, conv_max = find_preamble_offset(signal_iq, preamble_iq, sps)
+    print(conv_results)
+    print(conv_max)
+    print(offset)
 
     print(f"Преамбула найдена на позиции: {offset} символов")
     print(f"Длина выровненного сигнала: {len(signal_iq)}")
