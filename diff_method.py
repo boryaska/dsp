@@ -119,7 +119,7 @@ def find_preamble_offset(signal_iq, preamble_iq, sps):
     ...     signal_iq, preamble_iq, sps=4
     ... )
     >>> print(f"Преамбула найдена на позиции {offset} символов")
-    """
+    # """
     # Дифференциальное произведение для преамбулы
     d_pre = preamble_iq[1:] * np.conj(preamble_iq[:-1])
     
@@ -131,6 +131,7 @@ def find_preamble_offset(signal_iq, preamble_iq, sps):
         d_sig = sig_symbols[1:] * np.conj(sig_symbols[:-1])
         d_sig_list.append(d_sig)
     
+
     # Корреляция с нормализацией для каждой фазы
     conv_results = []
     conv_max = []
