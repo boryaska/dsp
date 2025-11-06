@@ -1,5 +1,7 @@
 import numpy as np
 # from numpy.fft import fft
+import matplotlib
+matplotlib.use('TkAgg')  # или 'Qt5Agg'
 import matplotlib.pyplot as plt
 from gardner2 import gardner_timing_recovery
 
@@ -35,6 +37,56 @@ def rrc_filter(sps, span, alpha):
     # Нормализация
     h = h / np.sqrt(np.sum(h ** 2))
     return h
+
+def find_optimal_sampling_phase(signal_filtered, preamble_symbols, sps, preamble_length=None):
+    """
+    Поиск оптимальной фазы семплирования (от 0 до sps-1) путем корреляции с преамбулой.
+    
+    Параметры:
+    -----------
+    signal_filtered : array
+        Отфильтрованный сигнал (после RRC)
+    preamble_symbols : array
+        Известные символы преамбулы
+    sps : int
+        Количество отсчетов на символ
+    preamble_length : int, optional
+        Длина преамбулы для анализа (по умолчанию вся преамбула)
+    
+    Возвращает:
+    -----------
+    best_phase : int
+        Оптимальная фаза семплирования (0..sps-1)
+    correlations : array
+        Значения корреляции для каждой фазы
+    """
+    if preamble_length is None:
+        preamble_length = len(preamble_symbols)
+    else:
+        preamble_length = min(preamble_length, len(preamble_symbols))
+    
+    preamble_ref = preamble_symbols[:preamble_length]
+    correlations = np.zeros(sps)
+    
+    # Перебираем все возможные фазы от 0 до sps-1
+    for phase in range(sps):
+        # Децимация с текущей фазой
+        sampled = signal_filtered[phase::sps]
+        
+        # Берем участок длиной с преамбулу
+        if len(sampled) < preamble_length:
+            correlations[phase] = 0
+            continue
+            
+        sampled_preamble = sampled[:preamble_length]
+        
+        # Вычисляем корреляцию (нормализованную)
+        correlation = np.abs(np.sum(sampled_preamble * np.conj(preamble_ref)))
+        correlations[phase] = correlation
+    
+    best_phase = np.argmax(correlations)
+    
+    return best_phase, correlations
 
 
 def find_preamble_offset(signal_iq, preamble_iq, sps):
