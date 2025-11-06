@@ -192,3 +192,4 @@ compare_spectra([signal_cutted, signal_filtered],
 - Можно передавать существующую ось (`ax`) для построения нескольких графиков
 
 
+
