@@ -148,16 +148,18 @@ def find_preamble_offset(signal_iq, preamble_iq, sps):
             else:
                 conv[k] = 0
         
-        conv_results.append(conv)
-        conv_max.append(np.argmax(np.abs(conv)))
+        conv_results.append(conv) 
+        conv_max.append((np.argmax(np.abs(conv)),np.max(np.abs(conv))))
     
-    # Находим медиану максимумов по всем фазам
-    offset = int(np.median(conv_max))
-    
+    # Находим фазу с максимальным значением корреляции
+    values = [val for idx, val in conv_max]
+    offset_index = int(np.argmax(values))
+    offset = conv_max[offset_index][0]
+    phase_offset = offset_index
     # Обрезаем сигнал с найденного смещения
-    signal_aligned = signal_iq[offset * sps:]
+    signal_aligned = signal_iq[offset * sps + phase_offset:]
     
-    return offset, signal_aligned, conv_results, conv_max
+    return offset, signal_aligned, conv_results, conv_max, phase_offset
 
 if __name__ == "__main__":
     signal = np.fromfile('qpsk_high_snr_sps_4_float32.pcm', dtype=np.float32)
@@ -168,10 +170,13 @@ if __name__ == "__main__":
     preamble_iq = preamble_data[::2] + 1j * preamble_data[1::2]
 
     # Поиск преамбулы и выравнивание сигнала
-    offset, signal_iq, conv_results, conv_max = find_preamble_offset(signal_iq, preamble_iq, sps)
+    offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_iq, preamble_iq, sps)
+    print('--------------------------------')
+    print(offset)
     print(conv_results)
     print(conv_max)
     print(offset)
+    print('--------------------------------')
 
     print(f"Преамбула найдена на позиции: {offset} символов")
     print(f"Длина выровненного сигнала: {len(signal_iq)}")

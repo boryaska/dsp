@@ -14,20 +14,45 @@ rrc = rrc_filter(4, 10, 0.35)
 signal_filtered = np.convolve(signal_iq, rrc, mode='same')
 signal_filtered = signal_filtered / np.std(signal_filtered)
 
-offset, signal_iq, conv_results, conv_max = find_preamble_offset(signal_filtered, preamble_iq, 4)
-signal_iq = signal_iq[3::4]
-signal_iq = signal_iq[:len(preamble_iq)]
+offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_filtered, preamble_iq, 4)
+print(conv_max)
 
-phase_signal = signal_iq[:len(preamble_iq)] * np.conj(preamble_iq)
+signal_for_f_rel = signal_iq[::4]
+plt.figure(figsize=(10, 10))
+plt.plot(signal_for_f_rel.real, signal_for_f_rel.imag, 'o', markersize=3, alpha=0.6)
+plt.title(f'Созвездие \n(f_rel = )')
+plt.xlabel('I (Real)')
+plt.ylabel('Q (Imag)')
+plt.grid(True, alpha=0.3)
+plt.axis('equal')
+plt.tight_layout()
+plt.show()
+
+signal_for_f_rel = signal_for_f_rel[:len(preamble_iq)]
+
+phase_signal = signal_for_f_rel * np.conj(preamble_iq)
+
 phases = np.angle(phase_signal)
-# Разность фаз между соседними отсчетами
-phase_diffs = np.diff(np.unwrap(phases))  # unwrap убирает скачки ±2π
+print(f"phases: {phases}")
 
-# Усредняем изменение фазы
+phase_diffs = np.diff((np.unwrap(phases)))
+print(f"phase_diffs: {phase_diffs}")
 avg_phase_diff = np.mean(phase_diffs)
+print(f"avg_phase_diff: {avg_phase_diff}")
+f_rel_method1 = avg_phase_diff / (2 * np.pi * 4)
+print(f"f_rel_method ----: {f_rel_method1}")
 
-# Переводим в частоту: Δφ = 2π·f_rel
-f_rel_method1 = avg_phase_diff / (2 * np.pi*4)
+
+plt.figure(figsize=(10, 10))
+plt.plot(phase_signal.real[:5], phase_signal.imag[:5], 'o', markersize=3, alpha=0.6)
+plt.title(f'Созвездие фаз\n(f_rel = )')
+plt.xlabel('I (Real)')
+plt.ylabel('Q (Imag)')
+plt.grid(True, alpha=0.3)
+plt.axis('equal')
+plt.tight_layout()
+plt.show()
+
 
 print(f_rel_method1)
 
@@ -49,47 +74,38 @@ f_rel_method3 = avg_rotation / (2 * np.pi*4)
 print(f_rel_method3)
 
 
-
-signal = np.fromfile('qpsk_high_snr_sps_4_float32.pcm', dtype=np.float32)
-signal_iq = signal[::2] + 1j * signal[1::2]
-signal_filtered = np.convolve(signal_iq, rrc, mode='same')
-signal_filtered = signal_filtered / np.std(signal_filtered)
-signal_filtered = signal_filtered[offset*4::]
-print(f"Длина signal_filtered: {len(signal_filtered)}")
-
-
-# for i in [f_rel_method1, f_rel_method2, f_rel_method3]:
-#     signal = signal_filtered.copy()
-#     n = np.arange(len(signal))
-#     signal = signal * np.exp(-1j * 2 * np.pi * i * n)
-#     signal = signal[0::4]
+for i in [f_rel_method1, f_rel_method2, f_rel_method3]:
+    signal = signal_iq.copy()
+    n = np.arange(len(signal))
+    signal = signal * np.exp(-1j * 2 * np.pi * i * n)
+    signal = signal[0::4]
  
-#     plt.figure(figsize=(10, 10))
-#     plt.plot(signal.real[:-100], signal.imag[:-100], 'o', markersize=3, alpha=0.6)
-#     plt.title(f'Созвездие после коррекции частоты\n(f_rel = {i:.6f})')
-#     plt.xlabel('I (Real)')
-#     plt.ylabel('Q (Imag)')
-#     plt.grid(True, alpha=0.3)
-#     plt.axis('equal')
-#     plt.tight_layout()
-#     plt.show()
+    plt.figure(figsize=(10, 10))
+    plt.plot(signal.real[:-100], signal.imag[:-100], 'o', markersize=3, alpha=0.6)
+    plt.title(f'Созвездие после коррекции частоты\n(f_rel = {i:.6f})')
+    plt.xlabel('I (Real)')
+    plt.ylabel('Q (Imag)')
+    plt.grid(True, alpha=0.3)
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.show()
 
-n = np.arange(len(signal_filtered))
-print(f"Длина n: {len(n)}")
-signal_filtred =  signal_filtered * np.exp(-1j * 2 * np.pi * f_rel_method2 * n)
-plt.figure(figsize=(10, 10))
-plt.plot(signal_filtred.real[:-400:4], signal_filtred.imag[:-400:4], 'o', markersize=3, alpha=0.6)
-plt.title(f'Созвездие после коррекции частоты\n(f_rel = {f_rel_method2:.6f})')
-plt.xlabel('I (Real)')
-plt.ylabel('Q (Imag)')
-plt.grid(True, alpha=0.3)
-plt.axis('equal')
-plt.tight_layout()
-plt.show()   
+n = np.arange(len(signal_iq))
+# print(f"Длина n: {len(n)}")
+signal_shifted =  signal_iq * np.exp(-1j * 2 * np.pi * f_rel_method2 * n)
+# plt.figure(figsize=(10, 10))
+# plt.plot(signal_shifted.real[:-400:4], signal_shifted.imag[:-400:4], 'o', markersize=3, alpha=0.6)
+# plt.title(f'Созвездие после коррекции частоты\n(f_rel = {f_rel_method2:.6f})')
+# plt.xlabel('I (Real)')
+# plt.ylabel('Q (Imag)')
+# plt.grid(True, alpha=0.3)
+# plt.axis('equal')
+# plt.tight_layout()
+# plt.show()   
 
 
-signal_recovered, errors, mu_history = gardner_timing_recovery(signal_filtred[:-400], 4, alpha=0.06)
-print(f"Финальное значение mu: {mu_history[-1]:.4f}")
+signal_recovered, errors, mu_history = gardner_timing_recovery(signal_shifted[:-400], 4, alpha=0.05)
+print(f"Последнее значение mu: {mu_history[-1]:.4f}")
 
 
 plt.figure(figsize=(10, 10))
