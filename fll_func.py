@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 def fll_func(signal):
     curr_freq = 0
-    kp = 0.0001
-    ki = 0.0001
+    kp = 0.00005
+    ki = 0.00
     integrator = 0
     phase = 0
     ef_n_list = np.zeros(len(signal), dtype=float)
@@ -26,25 +26,21 @@ def fll_func(signal):
 
     return signal_list, curr_freq, ef_n_list
 
+signal = np.fromfile(f'files/sig_symb_x4_ncr_77671952566_logon_id_1_tx_id_7616.pcm', dtype=np.float32)
+signal_iq = signal[::2] + 1j * signal[1::2]
+signal_iq = signal_iq/np.std(signal_iq)
 
-symbols = np.random.choice([1+1j, 1-1j, -1+1j, -1-1j], 4000) / np.sqrt(2)
+from diff_method import rrc_filter
+rrc = rrc_filter(4, 10, 0.35)
+signal_filtered = np.convolve(signal_iq, rrc, mode='same')
+signal_iq = signal_filtered / np.std(signal_filtered)
+signal_iq = signal_iq[505*4+3:-1000:4]
 
-plt.plot(symbols.real, symbols.imag, 'o')
+plt.plot(signal_iq.real, signal_iq.imag, 'o')
 plt.show()
 
 
-symbols_offset = symbols * np.exp(1j * 2 * np.pi * 0.005 * np.arange(len(symbols)))
-
-# noise = (np.random.randn(len(symbols_offset)) + 1j * np.random.randn(len(symbols_offset))) * 0.003
-
-# symbols_offset += noise
-
-
-
-plt.plot(symbols_offset.real, symbols_offset.imag, 'o')
-plt.show()
-
-signal_list, curr_freq, ef_n_list = fll_func(symbols_offset)
+signal_list, curr_freq, ef_n_list = fll_func(signal_iq)
 
 plt.plot(signal_list[500:].real, signal_list[500:].imag, 'o')
 plt.show()

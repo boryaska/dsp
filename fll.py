@@ -130,14 +130,15 @@ class FrequencyErrorDetector:
         decided_sample = (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample)))/np.sqrt(2)
         
         # Вычисляем фазовую ошибку
-        angle = np.angle(sample) - np.angle(decided_sample)
+        # angle = np.angle(sample) - np.angle(decided_sample)
+        angle = np.angle(sample * np.conj(decided_sample))
         
-        # Защита от выбросов (outlier rejection)
+        # # Защита от выбросов (outlier rejection)
     
-        if abs(angle) > np.pi/9:  # > 45 градусов
-            error = self.previous_error
-        else:
-            error = angle
+        # if abs(angle) > np.pi/9:  # > 45 градусов
+        #     error = self.previous_error
+        # else:
+        #     error = angle
 
         self.previous_error = error
 
@@ -237,15 +238,16 @@ class LoopFilter:
         
         # Ограничиваем интегратор (anti-windup)
         # Предотвращает слишком большие накопленные значения
-        self.integrator = np.clip(self.integrator, -self.freq_limit, self.freq_limit)
+        # self.integrator = np.clip(self.integrator, -self.freq_limit, self.freq_limit)
         
         # PI-контроллер
         # Пропорциональная часть (Kp·error): быстрая реакция
         # Интегральная часть (integrator): устранение постоянной ошибки
         freq_correction = error * self.Kp + self.integrator
+        # freq_correction = error * self.Kp
         
         # Ограничиваем итоговую коррекцию
-        freq_correction = np.clip(freq_correction, -self.freq_limit, self.freq_limit)
+        # freq_correction = np.clip(freq_correction, -self.freq_limit, self.freq_limit)
         
         return freq_correction
 
@@ -285,6 +287,7 @@ class NCO:
         """
         self.freq = initial_freq
         self.phase = 0.0
+        self.n = 0
         
     def reset(self):
         """Сброс состояния NCO"""
@@ -308,12 +311,13 @@ class NCO:
         """
         # Генерируем e^(-j*phase) для удаления частотного сдвига
         correction_signal = np.exp(-1j * self.phase)
+        self.n += 1
         
         # Обновляем фазу
-        self.phase += 2 * np.pi * self.freq
+        self.phase = 2 * np.pi * self.freq * n
         
         # Держим фазу в пределах [-π, π]
-        self.phase = np.arctan2(np.sin(self.phase), np.cos(self.phase))
+        # self.phase = np.arctan2(np.sin(self.phase), np.cos(self.phase))
         
         return correction_signal
     
@@ -604,9 +608,9 @@ if __name__ == "__main__":
     np.random.seed(42)
     
     # Параметры
-    num_symbols = 4000
-    sps = 4  # samples per symbol
-    f_offset = 0.01  # частотный сдвиг (10% от частоты символов)
+    num_symbols = 6000
+    sps = 2  # samples per symbol
+    f_offset = 0.004  # частотный сдвиг (10% от частоты символов)
     
     # Генерация QPSK символов (нормализованные)
     symbols = np.random.choice([1+1j, 1-1j, -1+1j, -1-1j], num_symbols) / np.sqrt(2)
@@ -629,26 +633,33 @@ if __name__ == "__main__":
     # то эффективная частота масштабируется в sps раз!
     
     # Берем только символы (каждый sps-й отсчет)
-    symbols_signal = signal[::sps]
+
+    n = np.arange(len(signal))
+    signal_with_offset = signal * np.exp(1j * 2 * np.pi * f_offset * n)
+    signal_with_offset = signal_with_offset[::sps].copy()  # .copy() для создания непрерывного массива
+    signal_with_offset = np.asarray(signal_with_offset, dtype=complex).flatten()  # Убедимся что это 1D массив
     
     # Применяем частотный сдвиг к символам
-    n_symbols = np.arange(len(symbols_signal))
-    signal_with_offset = symbols_signal * np.exp(1j * 2 * np.pi * f_offset * n_symbols)
+    # n_symbols = np.arange(len(symbols_signal))
+    # signal_with_offset = symbols_signal * np.exp(1j * 2 * np.pi * f_offset * n_symbols)
     
     # Добавляем шум
     # noise = (np.random.randn(len(signal_with_offset)) + 1j * np.random.randn(len(signal_with_offset))) * 0.01
+
     # signal_with_offset += noise
 
+    # signal_with_offset = signal_with_offset * np.exp(1j * 2 * np.pi * 0.05)
+
     # Визуализация созвездия ДО коррекции (закомментировано для отладки)
-    # plt.figure(figsize=(10, 10))
-    # plt.plot(signal_with_offset.real, signal_with_offset.imag, 'o', markersize=3, alpha=0.6)
-    # plt.title(f'Созвездие ДО FLL\n(f_offset={f_offset:.4f})')
-    # plt.xlabel('I (Real)')
-    # plt.ylabel('Q (Imag)')
-    # plt.grid(True, alpha=0.3)
-    # plt.axis('equal')
-    # plt.tight_layout()
-    # plt.show()
+    plt.figure(figsize=(10, 10))
+    plt.plot(signal_with_offset.real, signal_with_offset.imag, 'o', markersize=3, alpha=0.6)
+    plt.title(f'Созвездие ДО FLL\n(f_offset={f_offset:.4f})')
+    plt.xlabel('I (Real)')
+    plt.ylabel('Q (Imag)')
+    plt.grid(True, alpha=0.3)
+    plt.axis('equal')
+    plt.tight_layout()
+    plt.show()
     
     print(f"Истинный частотный сдвиг: {f_offset:.6f}")
     
@@ -680,10 +691,10 @@ if __name__ == "__main__":
     # Создаем FLL с уменьшенными коэффициентами для стабильности
     fll = FrequencyLockedLoop(
         detector_method=method,
-        Kp=0.005,   # пропорциональный коэффициент (уменьшен, чтобы избежать перерегулирования)
+        Kp=0.00001 ,   # пропорциональный коэффициент (уменьшен, чтобы избежать перерегулирования)
         Ki=0.00001, # интегральный коэффициент (медленное накопление для стабильности)
         freq_limit=0.15,
-        auto_acquire=True,      # Автоматическая оценка начальной частоты
+        auto_acquire=False,      # Автоматическая оценка начальной частоты
         acquire_samples=50      # Количество символов для оценки
     )
 
@@ -692,7 +703,7 @@ if __name__ == "__main__":
     corrected_signal, freq_estimate = fll.process_signal(
         signal_with_offset, 
         debug=True, 
-        debug_samples=50
+        debug_samples=800
     )
 
     print(f"\n{'='*60}")

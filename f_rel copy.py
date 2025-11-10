@@ -5,17 +5,29 @@ from diff_method import find_preamble_offset
 from gardner2 import gardner_timing_recovery
 # from fll import FrequencyLockedLoop
 
-signal = np.fromfile('qpsk_high_snr_sps_4_float32.pcm', dtype=np.float32)
+signal = np.fromfile('files/sig_symb_x4_ncr_77671952566_logon_id_1_tx_id_7616.pcm', dtype=np.float32)
 signal_iq = signal[::2] + 1j * signal[1::2]
 
-preamble = np.fromfile('preamb_symbols_float32.pcm', dtype=np.float32)
+preamble = np.fromfile('files/preambule_logon_id_2_tx_id_7616_float32.pcm', dtype=np.float32)
 preamble_iq = preamble[::2] + 1j * preamble[1::2]
 
-rrc = rrc_filter(4, 10, 0.35)
-signal_filtered = np.convolve(signal_iq, rrc, mode='same')
-signal_filtered = signal_filtered / np.std(signal_filtered)
+signal_aligned = signal_iq*np.exp((-1j)*2*np.pi*0.11*np.arange(len(signal_iq)))
 
-offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_filtered, preamble_iq, 4)
+# Фильтрация сигналa ФНЧ с частотой среза 0.17 (отн. к дискретизации)
+from scipy.signal import firwin, lfilter
+
+cutoff = 0.17  # норм. частота среза (отн. к Fs=1)
+numtaps = 101  # длина фильтра (можно варьировать)
+lpf_taps = firwin(numtaps, cutoff, window='hamming')
+
+# Применить ФНЧ к выровненному сигналу
+signal_aligned = lfilter(lpf_taps, 1.0, signal_aligned)
+
+# rrc = rrc_filter(4, 10, 0.35)
+# signal_filtered = np.convolve(signal_aligned, rrc, mode='same')
+# signal_filtered = signal_filtered / np.std(signal_filtered)
+
+offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_aligned, preamble_iq, 4)
 print(conv_max)
 
 signal_for_f_rel = signal_iq[::4]
