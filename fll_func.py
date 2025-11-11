@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-def fll_func(signal, Bn = 0.000001, y = 1):
+def fll_func(signal, Bn = 0.001, y = 1):
     curr_freq = 0
-    kp = 4*Bn/(y + 1/(4*y))
-    ki = 4*(Bn/(y + 1/(4*y)))**2
+    kp = 4*Bn/1000/(y + 1/(4*y))
+    ki = 4*(Bn/1000/(y + 1/(4*y)))**2
     integrator = 0
     phase = 0
     ef_n_list = np.zeros(len(signal), dtype=float)
@@ -29,18 +29,33 @@ def fll_func(signal, Bn = 0.000001, y = 1):
     return signal_list, curr_freq, curr_freq_list, ef_n_list
 
 if __name__ == "__main__":
-    symbols = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707], size=5000)
+    symbols = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707], size=50000)
 
-    symbols_offset = symbols * np.exp(1j * 2 * np.pi * 0.0001 * np.arange(len(symbols)))
+    symbols_offset = symbols * np.exp(1j * 2 * np.pi * 0.002 * np.arange(len(symbols)))
 
-    noise = (np.random.normal(0, 0.05, len(symbols_offset)) + 1j * np.random.normal(0, 0.05, len(symbols_offset))) / np.sqrt(2)
+    noise = (np.random.normal(0, 0.01, len(symbols_offset)) + 1j * np.random.normal(0, 0.01, len(symbols_offset))) / np.sqrt(2)
 
-    # symbols_offset += noise
+    # fft_len = len(noise)
+    # fft_signal_aligned = np.fft.fftshift(np.fft.fft(noise))
+    # freqs = np.fft.fftshift(np.fft.fftfreq(fft_len, d=1))
+    # plt.figure(figsize=(12, 5))
+    # plt.plot(freqs, np.abs(fft_signal_aligned))
+    # plt.title("FFT of signal (normalized frequency $[-0.5, 0.5]$)")
+    # plt.xlabel("Normalized Frequency ($F/F_d$)")
+    # plt.ylabel("Amplitude")
+    # plt.xlim(-0.5, 0.5)
+    # plt.grid(True, alpha=0.3)
+    # plt.tight_layout()
+    # plt.show()
 
-    plt.plot(symbols_offset.real, symbols_offset.imag, 'o')
-    plt.show()
+    symbols_offset += noise
 
-    signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(symbols_offset, 0.00001, 1)
+    # plt.plot(symbols_offset.real, symbols_offset.imag, 'o')
+    # plt.show()
+
+
+
+    signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(symbols_offset, 0.002, 1)
 
     fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
@@ -68,3 +83,16 @@ if __name__ == "__main__":
     plt.show()
 
     print(curr_freq)
+
+    # fft_len = len(signal_list)
+    # fft_signal_aligned = np.fft.fftshift(np.fft.fft(signal_list))
+    # freqs = np.fft.fftshift(np.fft.fftfreq(fft_len, d=1))
+    # plt.figure(figsize=(12, 5))
+    # plt.plot(freqs, np.abs(fft_signal_aligned))
+    # plt.title("FFT of signal (normalized frequency after FLL $[-0.5, 0.5]$)")
+    # plt.xlabel("Normalized Frequency ($F/F_d$)")
+    # plt.ylabel("Amplitude")
+    # plt.xlim(-0.5, 0.5)
+    # plt.grid(True, alpha=0.3)
+    # plt.tight_layout()
+    # plt.show()
