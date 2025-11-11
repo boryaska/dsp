@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-def fll_func(signal):
+def fll_func(signal, Bn = 0.000001, y = 1):
     curr_freq = 0
-    kp = 0.00005
-    ki = 0.00
+    kp = 4*Bn/(y + 1/(4*y))
+    ki = 4*(Bn/(y + 1/(4*y)))**2
     integrator = 0
     phase = 0
     ef_n_list = np.zeros(len(signal), dtype=float)
+    curr_freq_list = np.zeros(len(signal), dtype=float)
     signal_list = np.zeros(len(signal), dtype=complex)
 
 
@@ -22,30 +23,48 @@ def fll_func(signal):
         ef_n = error * kp + integrator
         ef_n_list[i] = ef_n
         curr_freq += ef_n
+        curr_freq_list[i] = curr_freq
 
 
-    return signal_list, curr_freq, ef_n_list
+    return signal_list, curr_freq, curr_freq_list, ef_n_list
 
-signal = np.fromfile(f'files/sig_symb_x4_ncr_77671952566_logon_id_1_tx_id_7616.pcm', dtype=np.float32)
-signal_iq = signal[::2] + 1j * signal[1::2]
-signal_iq = signal_iq/np.std(signal_iq)
+if __name__ == "__main__":
+    symbols = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707], size=5000)
 
-from diff_method import rrc_filter
-rrc = rrc_filter(4, 10, 0.35)
-signal_filtered = np.convolve(signal_iq, rrc, mode='same')
-signal_iq = signal_filtered / np.std(signal_filtered)
-signal_iq = signal_iq[505*4+3:-1000:4]
+    symbols_offset = symbols * np.exp(1j * 2 * np.pi * 0.0001 * np.arange(len(symbols)))
 
-plt.plot(signal_iq.real, signal_iq.imag, 'o')
-plt.show()
+    noise = (np.random.normal(0, 0.05, len(symbols_offset)) + 1j * np.random.normal(0, 0.05, len(symbols_offset))) / np.sqrt(2)
 
+    # symbols_offset += noise
 
-signal_list, curr_freq, ef_n_list = fll_func(signal_iq)
+    plt.plot(symbols_offset.real, symbols_offset.imag, 'o')
+    plt.show()
 
-plt.plot(signal_list[500:].real, signal_list[500:].imag, 'o')
-plt.show()
+    signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(symbols_offset, 0.00001, 1)
 
-plt.plot(ef_n_list)
-plt.show()
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
-print(curr_freq)
+    # Созвездие сигналов после FLL
+    axs[0].plot(signal_list.real, signal_list.imag, 'o', markersize=3, alpha=0.6)
+    axs[0].set_title("Созвездие после FLL")
+    axs[0].set_xlabel('I (Real)')
+    axs[0].set_ylabel('Q (Imag)')
+    axs[0].grid(True, alpha=0.3)
+    axs[0].axis('equal')
+
+    # Текущая накопленная оценка частоты (вектор по времени)
+    axs[1].plot(curr_freq_list)
+    axs[1].set_title("curr_freq (после FLL)")
+    axs[1].set_xlabel('n')
+    axs[1].set_ylabel('curr_freq')
+
+    # Эфф. изменение частоты во времени
+    axs[2].plot(ef_n_list)
+    axs[2].set_title("Эфф. изменение частоты (ef_n_list)")
+    axs[2].set_xlabel('n')
+    axs[2].set_ylabel('ef_n')
+
+    plt.tight_layout()
+    plt.show()
+
+    print(curr_freq)

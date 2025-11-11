@@ -162,17 +162,35 @@ def find_preamble_offset(signal_iq, preamble_iq, sps):
     return offset, signal_aligned, conv_results, conv_max, phase_offset
 
 if __name__ == "__main__":
-    signal = np.fromfile('qpsk_high_snr_sps_4_float32.pcm', dtype=np.float32)
+    signal = np.fromfile('files/sig_symb_x4_ncr_77671952566_logon_id_1_tx_id_7616.pcm', dtype=np.float32)
     signal_iq = signal[::2] + 1j * signal[1::2]
     sps = 4
 
-    preamble_data = np.fromfile('preamb_symbols_float32.pcm', dtype=np.float32)
+    preamble_data = np.fromfile('files/preambule_logon_id_2_tx_id_7616_float32.pcm', dtype=np.float32)
     preamble_iq = preamble_data[::2] + 1j * preamble_data[1::2]
+
+    signal_iq = signal_iq * np.exp(-1j * 2 * np.pi * 0.0105 * np.arange(len(signal_iq)))
+    # Добавление ФНЧ (низкочастотного фильтра) к сигналу
+
+    from scipy.signal import firwin, lfilter
+
+    fs = 1.0   # частота дискретизации (нормирована, тк частоты в спектре нормированы)
+    cutoff_hz = 0.14  # допустим, пропускаем до F/Fd = 0.15
+    numtaps = 101     # число коэффициентов ФНЧ (чем больше, тем круче фильтр, например, 51-201)
+
+    # Расчет коэффициентов ФНЧ
+    lpf_coeff = firwin(numtaps, cutoff=cutoff_hz, window='hamming', fs=fs)
+
+    # Применение фильтра к сигналу
+    signal_iq = lfilter(lpf_coeff, 1.0, signal_iq)
+    signal_iq = signal_iq/np.std(signal_iq)
+
 
     # Поиск преамбулы и выравнивание сигнала
     offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_iq, preamble_iq, sps)
     print('--------------------------------')
     print(offset)
+    print(phase_offset)
     print(conv_results)
     print(conv_max)
     print(offset)
@@ -189,15 +207,11 @@ if __name__ == "__main__":
     span = 10  # длина фильтра в символах
     alpha = 0.35  # roll-off factor
 
-    rrc = rrc_filter(sps, span, alpha)
-    signal_filtered = np.convolve(signal_iq, rrc, mode='same')
-    signal_filtered = signal_filtered / np.std(signal_filtered)
+    # rrc = rrc_filter(sps, span, alpha)
+    # signal_filtered = np.convolve(signal_iq, rrc, mode='same')
+    # signal_filtered = signal_filtered / np.std(signal_filtered)
     
-
-    signal_gardner, errors, mu_history = gardner_timing_recovery(signal_filtered, sps, alpha=0.04)
-
-    print(f"Длина signal_filtered: {len(signal_filtered)}")
-    print(f"Тип данных: {signal_filtered.dtype}")
+    signal_filtered = signal_iq
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     fig.suptitle('Созвездия для каждой фазы (sps=4)', fontsize=14)
@@ -210,7 +224,7 @@ if __name__ == "__main__":
         signal_iq_symbols = signal_filtered[i::sps]
         print(f"Фаза {i}: количество символов = {len(signal_iq_symbols)}")
         
-        ax.plot(signal_iq_symbols.real, signal_iq_symbols.imag, 'o', markersize=2, alpha=0.5)
+        ax.plot(signal_iq_symbols[:-400].real, signal_iq_symbols[:-400].imag, 'o', markersize=2, alpha=0.5)
         ax.set_title(f'Фаза {i} (N={len(signal_iq_symbols)})')
         ax.set_xlabel('I (Real)')
         ax.set_ylabel('Q (Imag)')
@@ -236,45 +250,88 @@ if __name__ == "__main__":
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
-
-
-
-    print(f"После Гарднера: {len(signal_gardner)} символов")
-
-    fig_const, axes_const = plt.subplots(2, 2, figsize=(12, 10))
-    fig_const.suptitle(f'Созвездие после Гарднера ({len(signal_gardner)} символов)', fontsize=14)
-
-    # После Gardner у нас уже downsampled сигнал (по 1 отсчету на символ)
-    # Поэтому просто строим весь сигнал на одном графике
-    ax = axes_const[0, 0]
-    ax.plot(signal_gardner.real, signal_gardner.imag, 'o', markersize=3, alpha=0.6)
-    ax.set_title('Все символы')
-    ax.set_xlabel('I (Real)')
-    ax.set_ylabel('Q (Imag)')
-    ax.grid(True, alpha=0.3)
-    ax.axis('equal')
-
-    # График ошибок синхронизации
-    ax = axes_const[0, 1]
-    ax.plot(errors)
-    ax.set_title('Ошибки синхронизации')
-    ax.set_xlabel('Символ')
-    ax.set_ylabel('Ошибка')
-    ax.grid(True, alpha=0.3)
-
-    # График истории mu
-    ax = axes_const[1, 0]
-    ax.plot(mu_history)
-    ax.set_title('История mu (дробная задержка)')
-    ax.set_xlabel('Символ')
-    ax.set_ylabel('mu')
-    ax.grid(True, alpha=0.3)
-
-    # Скрыть неиспользуемый график
-    axes_const[1, 1].axis('off')
-
-    plt.tight_layout()
-
-    # Показать все графики одновременно
     plt.show()
-    print(mu_history[-1])
+
+
+    signal_for_f_rel = signal_filtered[::4]
+    # plt.figure(figsize=(10, 10))
+    # plt.plot(signal_for_f_rel.real, signal_for_f_rel.imag, 'o', markersize=3, alpha=0.6)
+    # plt.title(f'Созвездие \n(f_rel = )')
+    # plt.xlabel('I (Real)')
+    # plt.ylabel('Q (Imag)')
+    # plt.grid(True, alpha=0.3)
+    # plt.axis('equal')
+    # plt.tight_layout()
+    # plt.show()
+
+    signal_for_f_rel = signal_for_f_rel[:len(preamble_iq)]
+    phase_signal = signal_for_f_rel * np.conj(preamble_iq)
+    phases = np.angle(phase_signal)
+    phase_diffs = np.diff((np.unwrap(phases)))
+    print(f"phase_diffs: {phase_diffs}")
+    avg_phase_diff = np.mean(phase_diffs)
+    print(f"avg_phase_diff: {avg_phase_diff}")
+    f_rel_method1 = avg_phase_diff / (2 * np.pi * 4)
+    print(f"f_rel_method ----: {f_rel_method1}")
+
+        # 4. МЕТОД 2: Линейная регрессия (более точный)
+    n = np.arange(len(phases))
+    unwrapped_phases = np.unwrap(phases)
+
+    # Наклон прямой φ(n) = 2π·f_rel·n + φ₀
+    # Используем МНК: slope = Σ(n·φ) / Σ(n²)
+    slope = np.polyfit(n, unwrapped_phases, 1)[0]  # коэффициент при n
+    f_rel_method2 = slope / (2 * np.pi*4)
+    print(f_rel_method2)
+
+    # 5. МЕТОД 3: Через произведение соседних отсчетов (без unwrap)
+    # Более устойчив к циклическим скачкам фазы
+    prod = phase_signal[1:] * np.conj(phase_signal[:-1])
+    avg_rotation = np.angle(np.mean(prod))
+    f_rel_method3 = avg_rotation / (2 * np.pi*4)
+    print(f_rel_method3)
+
+
+    for i in [f_rel_method1, f_rel_method2, f_rel_method3]:
+        signal = signal_iq.copy()
+        n = np.arange(len(signal))
+        signal = signal * np.exp(-1j * 2 * np.pi * i * n)
+        rrc = rrc_filter(sps, span, alpha)
+        signal_filtered = np.convolve(signal, rrc, mode='same')
+        signal_filtered = signal_filtered / np.std(signal_filtered)
+        # signal_filtered = signal
+
+        signal = signal_filtered[0::4]
+
+        from fll_func import fll_func
+        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(signal, 0.000001, 1)
+
+    
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+        # Созвездие после коррекции (signal_list)
+        axs[0].plot(signal_list.real, signal_list.imag, 'o', markersize=3, alpha=0.6)
+        axs[0].set_title(f'Созвездие после коррекции\n(f_rel = {i:.6f})')
+        axs[0].set_xlabel('I (Real)')
+        axs[0].set_ylabel('Q (Imag)')
+        axs[0].grid(True, alpha=0.3)
+        axs[0].axis('equal')
+
+        # Текущая накопленная оценка частоты
+        axs[1].plot(curr_freq_list)  # или просто значением, если curr_freq скаляр
+        axs[1].set_title("curr_freq")
+        axs[1].set_xlabel('n')
+        axs[1].set_ylabel('curr_freq')
+
+        # ef_n_list по времени
+        axs[2].plot(ef_n_list)
+        axs[2].set_title("Эфф. изменение частоты (ef_n_list)")
+        axs[2].set_xlabel('n')
+        axs[2].set_ylabel('ef_n')
+
+        plt.tight_layout()
+        plt.show()
+    
+
+
+

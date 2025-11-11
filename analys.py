@@ -31,28 +31,75 @@ print(conv_results)
 print(conv_max)
 print(phase_offset)
 
-signal_aligned = signal_iq[offset*4+phase_offset::4]
+signal_aligned = signal_iq[(offset-1)*4+0::4]
 
 
 
 
-rrc = rrc_filter(4, 10, 0.35)
-signal_filtered = np.convolve(signal_aligned, rrc, mode='same')
-signal_aligned = signal_filtered / np.std(signal_filtered)
+# rrc = rrc_filter(4, 10, 0.35)
+# signal_filtered = np.convolve(signal_aligned, rrc, mode='same')
+# signal_aligned = signal_filtered / np.std(signal_filtered)
 
 avg_freq = estimate_initial_frequency(signal_aligned[::4], 2000)
 print(f"avg_freq: {avg_freq:.6f}")
 
 
 
-fft_len = len(signal_aligned)
-fft_signal_aligned = np.fft.fftshift(np.fft.fft(signal_aligned))
+# fft_len = len(signal_iq)
+# fft_signal_aligned = np.fft.fftshift(np.fft.fft(signal_iq))
+# freqs = np.fft.fftshift(np.fft.fftfreq(fft_len, d=1))
+# plt.figure(figsize=(12, 5))
+# plt.plot(freqs, np.abs(fft_signal_aligned))
+# plt.title("FFT of signal (normalized frequency $[-0.5, 0.5]$)")
+# plt.xlabel("Normalized Frequency ($F/F_d$)")
+# plt.ylabel("Amplitude")
+# plt.xlim(-0.5, 0.5)
+# plt.grid(True, alpha=0.3)
+# plt.tight_layout()
+# plt.show()
+
+signal_iq = signal_iq[offset*4+phase_offset:42000]  
+
+fft_len = len(signal_iq)
+fft_signal_aligned = np.fft.fftshift(np.fft.fft(signal_iq))
 freqs = np.fft.fftshift(np.fft.fftfreq(fft_len, d=1))  # d=1, частота дискретизации нормирована
 
 
 plt.figure(figsize=(12, 5))
 plt.plot(freqs, np.abs(fft_signal_aligned))
 plt.title("FFT of signal (normalized frequency $[-0.5, 0.5]$)")
+plt.xlabel("Normalized Frequency ($F/F_d$)")
+plt.ylabel("Amplitude")
+plt.xlim(-0.5, 0.5)
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.show()
+
+signal_aligned = signal_iq * np.exp(-1j * 2 * np.pi * 0.01 * np.arange(len(signal_iq)))
+# Добавление ФНЧ (низкочастотного фильтра) к сигналу
+
+from scipy.signal import firwin, lfilter
+
+fs = 1.0   # частота дискретизации (нормирована, тк частоты в спектре нормированы)
+cutoff_hz = 0.14  # допустим, пропускаем до F/Fd = 0.15
+numtaps = 101     # число коэффициентов ФНЧ (чем больше, тем круче фильтр, например, 51-201)
+
+# Расчет коэффициентов ФНЧ
+lpf_coeff = firwin(numtaps, cutoff=cutoff_hz, window='hamming', fs=fs)
+
+# Применение фильтра к сигналу
+signal_aligned = lfilter(lpf_coeff, 1.0, signal_aligned)
+
+
+
+ft_len = len(signal_aligned)
+fft_signal_aligned = np.fft.fftshift(np.fft.fft(signal_aligned))
+freqs = np.fft.fftshift(np.fft.fftfreq(fft_len, d=1))  # d=1, частота дискретизации нормирована
+
+
+plt.figure(figsize=(12, 5))
+plt.plot(freqs, np.abs(fft_signal_aligned))
+plt.title("FFT of signal (normalized frequency filtred $[-0.5, 0.5]$)")
 plt.xlabel("Normalized Frequency ($F/F_d$)")
 plt.ylabel("Amplitude")
 plt.xlim(-0.5, 0.5)

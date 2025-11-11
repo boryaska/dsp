@@ -11,12 +11,12 @@ signal_iq = signal[::2] + 1j * signal[1::2]
 preamble = np.fromfile('files/preambule_logon_id_2_tx_id_7616_float32.pcm', dtype=np.float32)
 preamble_iq = preamble[::2] + 1j * preamble[1::2]
 
-signal_aligned = signal_iq*np.exp((-1j)*2*np.pi*0.11*np.arange(len(signal_iq)))
+signal_aligned = signal_iq*np.exp((-1j)*2*np.pi*0.01*np.arange(len(signal_iq)))
 
 # Фильтрация сигналa ФНЧ с частотой среза 0.17 (отн. к дискретизации)
 from scipy.signal import firwin, lfilter
 
-cutoff = 0.17  # норм. частота среза (отн. к Fs=1)
+cutoff = 0.14  # норм. частота среза (отн. к Fs=1)
 numtaps = 101  # длина фильтра (можно варьировать)
 lpf_taps = firwin(numtaps, cutoff, window='hamming')
 
@@ -25,10 +25,16 @@ signal_aligned = lfilter(lpf_taps, 1.0, signal_aligned)
 
 # rrc = rrc_filter(4, 10, 0.35)
 # signal_filtered = np.convolve(signal_aligned, rrc, mode='same')
-# signal_filtered = signal_filtered / np.std(signal_filtered)
+# signal_aligned = signal_filtered / np.std(signal_filtered)
 
 offset, signal_iq, conv_results, conv_max , phase_offset= find_preamble_offset(signal_aligned, preamble_iq, 4)
 print(conv_max)
+print(phase_offset)
+print(offset)
+
+signal_iq = signal_aligned[(offset)*4+phase_offset:]
+
+
 
 signal_for_f_rel = signal_iq[::4]
 plt.figure(figsize=(10, 10))
@@ -123,56 +129,6 @@ signal_shifted =  signal_iq * np.exp(-1j * 2 * np.pi * f_rel_method2 * n)
 # signal_recovered = signal_recovered*np.exp(1j * 2 * np.pi * 0.022)
 
 # Создаем FLL с разными методами
-methods = ['cross_product', 'atan2', 'decision_directed']
-sps = 4
-
-for method in methods:
-    print(f"\n{'='*60}")
-    print(f"Метод: {method}")
-    print(f"{'='*60}")
-    
-    # Создаем FLL
-    fll = FrequencyLockedLoop(
-        detector_method=method,
-        Kp=0.004,  # пропорциональный коэффициент
-        Ki=0.00005,  # интегральный коэффициент
-        freq_limit=0.2
-
-    )
-    
-    # Обрабатываем сигнал
-    corrected_signal, freq_estimate = fll.process_signal(signal_shifted)
-    
-    print(f"Оценка частоты FLL: {freq_estimate:.6f}")
-    print(f"Ошибка оценки: {abs(freq_estimate - f_rel_method2):.6f}")
-    
-    # Визуализация
-    fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-    
-    # До коррекции
-    axes[0].plot(signal_shifted[::sps].real, 
-                signal_shifted[::sps].imag, 
-                'o', markersize=4, alpha=0.5)
-    axes[0].set_title(f'До FLL (f_offset={f_rel_method2:.4f})')
-    axes[0].set_xlabel('I')
-    axes[0].set_ylabel('Q')
-    axes[0].grid(True, alpha=0.3)
-    axes[0].axis('equal')
-    
-    # После коррекции
-    axes[1].plot(corrected_signal[100::sps].real, 
-                corrected_signal[100::sps].imag, 
-                'o', markersize=4, alpha=0.5)
-    axes[1].set_title(f'После FLL (метод: {method}, оценка={freq_estimate:.6f})')
-    axes[1].set_xlabel('I')
-    axes[1].set_ylabel('Q')
-    axes[1].grid(True, alpha=0.3)
-    axes[1].axis('equal')
-    
-    plt.tight_layout()
-    plt.show()
-
-
 
 
 # plt.figure(figsize=(10, 10))
