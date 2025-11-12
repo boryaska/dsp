@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from read_file import rrc_filter
 
 
-def gardner_timing_recovery(signal, sps, alpha=0.07, mu_initial=0.0):
+def gardner_timing_recovery(signal, sps, alpha=0.007, mu_initial=0.0):
     """
     Алгоритм Гарднера для восстановления тактовой синхронизации.
     
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     sps = 8            # samples per symbol
     T = 1              # символный период (условно)
     mu = 0.0           # fractional timing offset (начальный)
-    alpha = 0.05       # шаг корректировки тайминга (петли)
+    alpha = 0.07       # шаг корректировки тайминга (петли)
     np.random.seed(1)
 
 
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
 
     # --- Вносим временной сдвиг (искусственно) ---
-    delay = 0.65  
+    delay = 0.095  
     t = np.arange(len(samples))
     shifted = np.interp(t, t - delay, samples)
 

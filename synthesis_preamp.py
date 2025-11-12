@@ -5,6 +5,8 @@ from diff_method import rrc_filter, find_preamble_offset
 from scipy.signal import find_peaks
 from collections import defaultdict
 from fll_func import fll_func
+from scipy.ndimage import shift as array_shift
+from gardner2 import gardner_timing_recovery
 
 
 def generate_preamb(L=100, PSK = 4):
@@ -63,17 +65,32 @@ pre = generate_preamb(L=500)
 pack = gen_packets(pre, 3000)
 print(len(pack))
 
-symbols = gen_packet_symbols(pack, 4, 30)
+symbols = gen_packet_symbols(pack, 5, 30)
 samples = gen_samples(symbols, sps)
 samples = filter_samples(samples, sps)
 samples = frequency_offset(samples, 0.01716302)
-samples = add_noise(samples, 0.09)
+
+
+samples = array_shift(samples, shift=0.41, mode='nearest')
+
+
+samples = add_noise(samples, 0.04)
+
 print(len(symbols))
 # print(symbols)
 
 analys.plot_signal(samples)
 analys.plot_constellation(samples, 4)
-# analys.plot_fft(samples)
+
+recovered, timing_errors, mu_history = gardner_timing_recovery(samples, sps, alpha=0.007, mu_initial=0.0)
+# print(np.mean(mu_history[-100:]))
+samples = array_shift(samples, shift=-np.mean(mu_history[-100:]), mode='nearest')
+
+analys.plot_signal(samples)
+analys.plot_constellation(samples, 4)
+
+print(len(recovered))
+print(len(samples))
 
 offset, signal_aligned, conv_results, conv_max, phase_offset = find_preamble_offset(samples, pre, sps)
 # print(offset)
