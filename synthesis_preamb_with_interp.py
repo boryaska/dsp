@@ -155,22 +155,22 @@ def find_preamble_offset_with_interpolate_dots(signal_iq, preamble_iq, sps, inte
     
     return offset, signal_aligned, conv_results, conv_max, phase_offset, conv_results_interp
 sps = 4
-pre = generate_preamb(L=500)
+pre = generate_preamb(L=300)
 # print(pre)
 # print(type(pre))
 
-pack = gen_packets(pre, 3000)
+pack = gen_packets(pre, 2000)
 print(len(pack))
 
 symbols = gen_packet_symbols(pack, 5, 30)
 samples = gen_samples(symbols, sps)
 samples = filter_samples(samples, sps)
-samples = frequency_offset(samples, 0.01716302)
+samples = frequency_offset(samples, 0.01126302)
 
 print(len(samples))
-samples = array_shift(samples, shift=0.61, mode='nearest')
+samples = array_shift(samples, shift=0.45, mode='nearest')
 print(len(samples))
-samples = add_noise(samples, 0.05)
+samples = add_noise(samples, 0.01)
 
 
 
@@ -190,7 +190,7 @@ offset, signal_aligned, conv_results, conv_max, phase_offset, conv_results_inter
 # print(phase_offset)
 
 if conv_results_interp:
-    print('проверяем интерполированные корреляции')
+    # print('проверяем интерполированные корреляции')
     
     corr_abs = np.zeros(sps * 2 * len(conv_results[0]))
     for i in range(len(conv_results)):
@@ -240,10 +240,10 @@ for peak in peaks:
     if offset + len(pack) * sps > len(samples):
         continue
 
-    print(f'offsetв отсчетах: {offset}')
+    # print(f'offsetв отсчетах: {offset}')
 
     signal_cutted = samples[(offset) : (offset) + (len(pack) * sps)]
-    print(f'длина сигнала в отсчетах после вырезания: {len(signal_cutted)}')
+    # print(f'длина сигнала в отсчетах после вырезания: {len(signal_cutted)}')
     signal_for_f_rel = signal_cutted[::sps]
     signal_for_f_rel = signal_for_f_rel[:len(pre)]
     phase_signal = signal_for_f_rel * np.conj(pre)
@@ -259,12 +259,12 @@ for peak in peaks:
         rrc = rrc_filter(sps, 10, 0.35)
         filtred_signal = np.convolve(shiftted_signal, rrc, mode='same')
         filtred_signal = filtred_signal / np.std(filtred_signal)
-        print(f'длина сигнала в отсчетах после фильтрации: {len(filtred_signal)}')
+        # print(f'длина сигнала в отсчетах после фильтрации: {len(filtred_signal)}')
 
         recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, sps, alpha=0.007, mu_initial=0.0)
-        print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
+        # print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
         signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.003)
-        print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
+        # print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
         # Созвездие сигналов после FLL
@@ -292,12 +292,12 @@ for peak in peaks:
 
         decision_direct = decision_direct_func(signal_list)
         if len(decision_direct) == len(pack):
-            print('длина пакета совпадает')
+            # print('длина пакета совпадает')
             count = 0
             for i in range(len(decision_direct)):
                 if decision_direct[i] == pack[i]:
                     count += 1
-            if count/len(decision_direct) >= 0.3:
+            if count/len(decision_direct) >= 0.2:
                 print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают') 
         else:
             print('длина пакета не совпадает')        

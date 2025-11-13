@@ -54,9 +54,13 @@ def gardner_timing_recovery(signal, sps, alpha=0.007, mu_initial=0.0):
     mu_history = []
     
     mu = mu_initial
-    k = sps * 2  # начинаем с 2 символов запаса
     
-    while k < len(signal) - sps:
+    # Добавляем первый символ без коррекции
+    recovered.append(signal[0])
+    
+    k = sps  # начинаем с 1 символа запаса
+    
+    while k <= len(signal) - sps:
         # Нормализация mu: если mu выходит за пределы [-sps, sps], корректируем k
         while mu >= sps:
             mu -= sps
