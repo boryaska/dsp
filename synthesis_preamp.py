@@ -229,7 +229,7 @@ for i in range(4):
 
 plt.tight_layout()
 plt.show()        
-
+f_rel_list = []
 print('try_offset_phase: ', try_offset_phase)
 n = 0
 for offset, phase in try_offset_phase:
@@ -249,6 +249,7 @@ for offset, phase in try_offset_phase:
     phase_diffs = np.diff((np.unwrap(phases)))
     avg_phase_diff = np.mean(phase_diffs)
     f_rel_method1 = avg_phase_diff / (2 * np.pi * sps)
+    f_rel_list.append(f_rel_method1)
 
     # n = np.arange(len(phases))
     # unwrapped_phases = np.unwrap(phases)
@@ -264,9 +265,9 @@ for offset, phase in try_offset_phase:
         shiftted_signal = shiftted_signal * np.exp(-1j * 2 * np.pi * f_rel * (np.arange(len(shiftted_signal)) + offset * sps + phase) )
         # analys.plot_constellation(shiftted_signal, 1)
 
-        # rrc = rrc_filter(sps, 10, 0.35)
-        # filtred_signal = np.convolve(shiftted_signal, rrc, mode='same')
-        # filtred_signal = filtred_signal / np.std(filtred_signal)
+        rrc = rrc_filter(sps, 10, 0.35)
+        filtred_signal = np.convolve(shiftted_signal, rrc, mode='same')
+        filtred_signal = filtred_signal / np.std(filtred_signal)
 
         signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(filtred_signal[::sps], Bn = 0.003)
 
@@ -307,5 +308,5 @@ for offset, phase in try_offset_phase:
         
         
 
-
+print(f_rel_list)
 

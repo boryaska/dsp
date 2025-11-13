@@ -168,9 +168,9 @@ samples = filter_samples(samples, sps)
 samples = frequency_offset(samples, 0.01126302)
 
 print(len(samples))
-samples = array_shift(samples, shift=0.45, mode='nearest')
+samples = array_shift(samples, shift=0.612, mode='nearest')
 print(len(samples))
-samples = add_noise(samples, 0.01)
+samples = add_noise(samples, 0.03)
 
 
 
@@ -229,20 +229,21 @@ print(peaks)
 for peak in peaks:
     index_offset[peak] = corr_abs[peak]
 print(f"Фаза: найдено {len(peaks)} пиков, макс. корреляция = {max_corr:.2f}")
-
+f_rel_list = []
 print(index_offset)
 for peak in peaks:
     if conv_results_interp:
-        samples = array_shift(samples, shift=0.5, mode='nearest')
+        signal_iq = array_shift(samples, shift=0.5, mode='nearest')
         offset = (peak - 1) // 2
     else:
         offset = peak // 2
-    if offset + len(pack) * sps > len(samples):
+        signal_iq = samples
+    if offset + len(pack) * sps > len(signal_iq):
         continue
 
-    # print(f'offsetв отсчетах: {offset}')
-
-    signal_cutted = samples[(offset) : (offset) + (len(pack) * sps)]
+    
+    print(f'offset: {offset}')
+    signal_cutted = signal_iq[(offset) : (offset) + (len(pack) * sps)]
     # print(f'длина сигнала в отсчетах после вырезания: {len(signal_cutted)}')
     signal_for_f_rel = signal_cutted[::sps]
     signal_for_f_rel = signal_for_f_rel[:len(pre)]
@@ -251,7 +252,7 @@ for peak in peaks:
     phase_diffs = np.diff((np.unwrap(phases)))
     avg_phase_diff = np.mean(phase_diffs)
     f_rel_method1 = avg_phase_diff / (2 * np.pi * sps)
-
+    f_rel_list.append(f_rel_method1)
     for f_rel in [f_rel_method1]:
         shiftted_signal = signal_cutted.copy()
         shiftted_signal = shiftted_signal * np.exp(-1j * 2 * np.pi * f_rel * (np.arange(len(shiftted_signal)) + offset))
@@ -263,7 +264,7 @@ for peak in peaks:
 
         recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, sps, alpha=0.007, mu_initial=0.0)
         # print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
-        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.003)
+        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.004)
         # print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
@@ -305,3 +306,4 @@ for peak in peaks:
 
 
 
+print(f_rel_list)
