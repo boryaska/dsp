@@ -167,82 +167,84 @@ samples = gen_samples(symbols, sps)
 samples = filter_samples(samples, sps)
 samples = frequency_offset(samples, 0.01716302)
 
-
+print(len(samples))
 samples = array_shift(samples, shift=0.61, mode='nearest')
+print(len(samples))
+samples = add_noise(samples, 0.05)
 
 
-samples = add_noise(samples, 0.1)
-
-print(len(symbols))
-# print(symbols)
-analys.plot_constellation(samples, 4)
-analys.plot_signal(samples)
 
 
-# recovered, timing_errors, mu_history = gardner_timing_recovery(samples, sps, alpha=0.007, mu_initial=0.0)
 # # print(np.mean(mu_history[-100:]))
 # samples = array_shift(samples, shift=-np.mean(mu_history[-100:]), mode='nearest')
 
-analys.plot_signal(samples)
-analys.plot_constellation(samples, 4)
+# analys.plot_signal(samples)
+# analys.plot_constellation(samples, 4)
 
 # print(len(recovered))
-print(len(samples))
+
 
 offset, signal_aligned, conv_results, conv_max, phase_offset, conv_results_interp = find_preamble_offset_with_interpolate_dots(samples, pre, sps, interp = True)
 # print(offset)
 # print(conv_max)
 # print(phase_offset)
 
-
-index_offset = defaultdict(lambda: [0, 0, 0, 0])
-
-for i in range(sps):
-    corr_abs = abs(conv_results[i])
-    max_corr = np.max(corr_abs)
+if conv_results_interp:
+    print('проверяем интерполированные корреляции')
     
-    # Используем относительные пороги от максимума
-    peaks, properties = find_peaks(
-        corr_abs,
-        height=max_corr * 0.7,   
-        distance=len(pack) * 0.1,    
-        prominence=max_corr * 0.1  )  
-    for peak in peaks:
-        index_offset[peak][i] = corr_abs[peak]
-    print(f"Фаза {i}: найдено {len(peaks)} пиков, макс. корреляция = {max_corr:.2f}")
+    corr_abs = np.zeros(sps * 2 * len(conv_results[0]))
+    for i in range(len(conv_results)):
+        for j in range(len(conv_results[i])):
+            corr_abs[j * sps * 2 + i * 2] = np.abs(conv_results[i][j])
+            
+    for i in range(len(conv_results_interp)):
+        for j in range(len(conv_results_interp[i])):
+            corr_abs[j * sps * 2 + i * 2 + 1] = np.abs(conv_results_interp[i][j])        
+        
+else:
+    
+    corr_abs = np.zeros(sps * len(conv_results[0]))
+    for i in range(len(conv_results)):
+        for j in range(len(conv_results[i])):
+            corr_abs[j * sps + i] = np.abs(conv_results[i][j])    
 
-try_offset_phase = []
-for key, value in index_offset.items():
-    try_offset_phase.append((key, np.argmax(value)))
-    # print(key, value)
+max_corr = np.max(corr_abs)
+# Используем относительные пороги от максимума
 
-fig2, axes2 = plt.subplots(2, 2, figsize=(14, 10))
-fig2.suptitle('Индексы пиков для каждой фазы (sps=4)', fontsize=14)
+plt.figure(figsize=(18, 4))
+plt.plot(np.abs(corr_abs))
+plt.title('График corr_abs')
+plt.xlabel('Индекс')
+plt.ylabel('|corr_abs|')
+plt.grid(True)
+plt.show()
+index_offset = defaultdict(int)
+peaks, properties = find_peaks(
+    corr_abs,
+    height=max_corr * 0.7,   
+    distance=len(pack) * 0.1,    
+    prominence=max_corr * 0.1  )
+print('пики корреляции')
+print(peaks)      
+for peak in peaks:
+    index_offset[peak] = corr_abs[peak]
+print(f"Фаза: найдено {len(peaks)} пиков, макс. корреляция = {max_corr:.2f}")
 
-for i in range(4):
-    row = i // 2
-    col = i % 2
-    ax = axes2[row, col]
-    ax.plot(abs(conv_results[i]))
-    ax.set_title(f'Фаза {i}')
-    ax.set_xlabel('Индекс')
-
-plt.tight_layout()
-plt.show()        
-
-print('try_offset_phase: ', try_offset_phase)
-n = 0
-for offset, phase in try_offset_phase:
-    n += 1
-    print(f'{n} / {len(try_offset_phase)}') 
-    if offset * sps + phase + len(pack) * sps > len(samples):
+print(index_offset)
+for peak in peaks:
+    if conv_results_interp:
+        samples = array_shift(samples, shift=0.5, mode='nearest')
+        offset = (peak - 1) // 2
+    else:
+        offset = peak // 2
+    if offset + len(pack) * sps > len(samples):
         continue
 
-    signal_cutted = samples[(offset * sps + phase) : (offset * sps + phase) + (len(pack) * sps)] 
-    
-    signal_for_f_rel = signal_cutted[::sps]
-    # print(f"Длина signal_for_f_rel: {len(signal_for_f_rel)}")
+    print(f'offsetв отсчетах: {offset}')
 
+    signal_cutted = samples[(offset) : (offset) + (len(pack) * sps)]
+    print(f'длина сигнала в отсчетах после вырезания: {len(signal_cutted)}')
+    signal_for_f_rel = signal_cutted[::sps]
     signal_for_f_rel = signal_for_f_rel[:len(pre)]
     phase_signal = signal_for_f_rel * np.conj(pre)
     phases = np.angle(phase_signal)
@@ -250,26 +252,19 @@ for offset, phase in try_offset_phase:
     avg_phase_diff = np.mean(phase_diffs)
     f_rel_method1 = avg_phase_diff / (2 * np.pi * sps)
 
-    # n = np.arange(len(phases))
-    # unwrapped_phases = np.unwrap(phases)
-    # slope = np.polyfit(n, unwrapped_phases, 1)[0] 
-    # f_rel_method2 = slope / (2 * np.pi * sps)
-
-    # prod = phase_signal[1:] * np.conj(phase_signal[:-1])
-    # avg_rotation = np.angle(np.mean(prod))
-    # f_rel_method3 = avg_rotation / (2 * np.pi * sps)
-
     for f_rel in [f_rel_method1]:
         shiftted_signal = signal_cutted.copy()
-        shiftted_signal = shiftted_signal * np.exp(-1j * 2 * np.pi * f_rel * (np.arange(len(shiftted_signal)) + offset * sps + phase) )
-        # analys.plot_constellation(shiftted_signal, 1)
+        shiftted_signal = shiftted_signal * np.exp(-1j * 2 * np.pi * f_rel * (np.arange(len(shiftted_signal)) + offset))
 
-        # rrc = rrc_filter(sps, 10, 0.35)
-        # filtred_signal = np.convolve(shiftted_signal, rrc, mode='same')
-        # filtred_signal = filtred_signal / np.std(filtred_signal)
+        rrc = rrc_filter(sps, 10, 0.35)
+        filtred_signal = np.convolve(shiftted_signal, rrc, mode='same')
+        filtred_signal = filtred_signal / np.std(filtred_signal)
+        print(f'длина сигнала в отсчетах после фильтрации: {len(filtred_signal)}')
 
-        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(filtred_signal[::sps], Bn = 0.003)
-
+        recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, sps, alpha=0.007, mu_initial=0.0)
+        print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
+        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.003)
+        print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
         # Созвездие сигналов после FLL
@@ -297,15 +292,16 @@ for offset, phase in try_offset_phase:
 
         decision_direct = decision_direct_func(signal_list)
         if len(decision_direct) == len(pack):
+            print('длина пакета совпадает')
             count = 0
             for i in range(len(decision_direct)):
                 if decision_direct[i] == pack[i]:
                     count += 1
             if count/len(decision_direct) >= 0.3:
-                print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают')
-                
-        
-        
+                print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают') 
+        else:
+            print('длина пакета не совпадает')        
+
 
 
 
