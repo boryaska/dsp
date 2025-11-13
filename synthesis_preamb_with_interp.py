@@ -264,7 +264,7 @@ for peak in peaks:
 
         recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, sps, alpha=0.007, mu_initial=0.0)
         # print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
-        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.004)
+        signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.012)
         # print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
 
@@ -298,8 +298,18 @@ for peak in peaks:
             for i in range(len(decision_direct)):
                 if decision_direct[i] == pack[i]:
                     count += 1
-            if count/len(decision_direct) >= 0.2:
-                print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают') 
+            if count/len(decision_direct) >= 0.5:
+                print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают')
+            else:
+                for phase in range (4):
+                    count = 0
+
+                    for i in range(len(decision_direct)):
+                        decision_direct[i] = decision_direct[i] * np.exp(1j * 2 * np.pi / 4)
+                        if decision_direct[i] == pack[i]:
+                            count += 1
+                    if count/len(decision_direct) >= 0.2:
+                        print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают, сдвиг фазы: {(phase + 1) * 90} градусов')
         else:
             print('длина пакета не совпадает')        
 
