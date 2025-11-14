@@ -170,7 +170,7 @@ samples = frequency_offset(samples, 0.01126302)
 print(len(samples))
 samples = array_shift(samples, shift=0.612, mode='nearest')
 print(len(samples))
-samples = add_noise(samples, 0.03)
+samples = add_noise(samples, 0.6)
 
 
 
@@ -179,7 +179,7 @@ samples = add_noise(samples, 0.03)
 # samples = array_shift(samples, shift=-np.mean(mu_history[-100:]), mode='nearest')
 
 # analys.plot_signal(samples)
-# analys.plot_constellation(samples, 4)
+analys.plot_constellation(samples, 4)
 
 # print(len(recovered))
 
