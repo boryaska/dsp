@@ -3,6 +3,8 @@ from diff_method import rrc_filter
 from scipy.ndimage import shift as array_shift
 from scipy.signal import find_peaks
 from gardner2 import gardner_timing_recovery
+import matplotlib.pyplot as plt
+import analys
 class Processing:
     def __init__(self, signal = None, preamble = None, packet_symb = None, sps = 4, constellation = 'qpsk', interp = False):
         self.signal = signal
@@ -35,29 +37,35 @@ class Processing:
             elif self.constellation == 'qpsk':
                 decided_sample = (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample))) / np.sqrt(2)
             elif self.constellation == '8psk':
-                angle = np.angle(sample)
-                decid =  [np.pi/4 * np.arange(8) - np.pi ]
+                decid =  np.exp(1j * (np.pi/4 * np.arange(8) - np.pi))
+                min_dist = +np.inf
                 for d in decid:
-                    if abs((d - angle) % np.pi) <= np.pi/8:
-                        decided_sample = np.exp(1j * d)
-                        break
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
+                    
             elif self.constellation == '16psk':
-                angle = np.angle(sample)
-                decid =  [np.pi/8 * np.arange(16) - np.pi ]
+                decid =  np.exp(1j * (np.pi/8 * np.arange(16) - np.pi))
+                min_dist = +np.inf
                 for d in decid:
-                    if abs((d - angle) % np.pi) <= np.pi/16:
-                        decided_sample = np.exp(1j * d)
-                        break
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
+                    
             elif self.constellation == '16apsk':
-                angle = np.angle(sample)
-                if abs(sample) *  2 - 1 > 0.5:
-                    decid =  [np.pi/6 * np.arange(12) - np.pi + np.pi/12]
-                    for d in decid:
-                        if abs((d - angle) % np.pi) <= np.pi/12:
-                            decided_sample = np.exp(1j * d)
-                            
-                elif abs(sample) *  2 - 1 <= 0.5:
-                    decided_sample = (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample))) / np.sqrt(2)  
+                inner_ring = 0.5 * np.exp(1j * (np.pi/4 + np.arange(4) * np.pi/2))
+                outer_ring = 1 * np.exp(1j * (np.pi/12 + np.arange(12) * np.pi/6))
+                constellation_points = np.concatenate([inner_ring, outer_ring])
+                min_dist = +np.inf
+                for d in constellation_points:
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
+                  
+                
                 
             error = np.angle(sample * np.conj(decided_sample))
             integrator += error * ki
@@ -66,64 +74,104 @@ class Processing:
             curr_freq += ef_n
             curr_freq_list[i] = curr_freq        
 
-
+        print(f'len(signal_list) {len(signal_list)}')
         return signal_list, curr_freq, curr_freq_list, ef_n_list
 
     def decision_direct(self, signal_list):
 
         # Определение символов в зависимости от созвездия, логика из fll_func
 
-        def decide_symbol(sample, constellation):
-            if constellation == 'bpsk':
-                return (np.sign(np.real(sample)) + 1j * 0)
-            elif constellation == 'qpsk':
-                return (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample)))/np.sqrt(2)
-            elif constellation == '8psk':
-                angle = np.angle(sample)
-                decid =  [np.pi/4 * np.arange(8) - np.pi ]
+        def decide_symbol(sample):
+            if self.constellation == 'bpsk':
+                decided_sample = (np.sign(np.real(sample)) + 1j * 0)
+            elif self.constellation == 'qpsk':
+                decided_sample = (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample))) / np.sqrt(2)
+            elif self.constellation == '8psk':
+                decid =  np.exp(1j * (np.pi/4 * np.arange(8) - np.pi))
+                min_dist = +np.inf
                 for d in decid:
-                    if abs((d - angle) % np.pi) <= np.pi/8:
-                        return np.exp(1j * d)
-            elif constellation == '16psk':
-                angle = np.angle(sample)
-                decid =  [np.pi/8 * np.arange(16) - np.pi ]
-                for d in decid:
-                    if abs((d - angle) % np.pi) <= np.pi/16:
-                        return np.exp(1j * d)
-            elif constellation == '16apsk':
-                angle = np.angle(sample)
-                if abs(sample) *  2 - 1 > 0.5:
-                    decid =  [np.pi/6 * np.arange(12) - np.pi + np.pi/12]
-                    for d in decid:
-                        if abs((d - angle) % np.pi) <= np.pi/12:
-                            return np.exp(1j * d)
-                            
-                elif abs(sample) *  2 - 1 <= 0.5:
-                    return (np.sign(np.real(sample)) + 1j * np.sign(np.imag(sample))) / np.sqrt(2) / 2   
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
                     
-        decision_direct = np.zeros(len(signal_list), dtype=complex)
+            elif self.constellation == '16psk':
+                decid =  np.exp(1j * (np.pi/8 * np.arange(16) - np.pi))
+                min_dist = +np.inf
+                for d in decid:
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
+                    
+            elif self.constellation == '16apsk':
+                inner_ring = 0.5 * np.exp(1j * (np.pi/4 + np.arange(4) * np.pi/2))
+                outer_ring = 1 * np.exp(1j * (np.pi/12 + np.arange(12) * np.pi/6))
+                constellation_points = np.concatenate([inner_ring, outer_ring])
+                min_dist = +np.inf
+                for d in constellation_points:
+                    dist = np.abs(d - sample)
+                    if dist < min_dist:
+                        min_dist = dist
+                        decided_sample = d
+
+            return decided_sample            
+                    
+        decision_direct = np.zeros(len(signal_list), dtype=np.complex64)
         for i in range(len(signal_list)):
-            decision_direct[i] = decide_symbol(signal_list[i], self.constellation)
-        if self.packet_symb:
+            # print(f'проверка пакета {i}')
+            decision_direct[i] = decide_symbol(signal_list[i])
+
+        print(f'decision_direct {decision_direct}')
+        analys.plot_constellation(decision_direct, 1)
+        print(f'self.packet_symb {self.packet_symb[:6]}')
+        print(f'decision_direct {decision_direct[:6]}')
+        if self.packet_symb is not None:
             if len(self.packet_symb) == len(decision_direct): 
+                print(f'длина пакета совпадает с decision_direct {len(self.packet_symb)}')
+                
+                # Сохраняем исходный decision_direct для проверки сдвигов
+                decision_original = decision_direct.copy()
+                
+                # Проверка без сдвига фазы
                 count = 0   
                 for i in range(len(decision_direct)):
-                    if decision_direct[i] == self.packet_symb[i]:
+                    # Используем сравнение с допуском для комплексных чисел
+                    if np.isclose(decision_direct[i], self.packet_symb[i], rtol=1e-5, atol=1e-5):
                         count += 1
-                if count/len(decision_direct) >= 0.5:
-                    print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают')
+                print(f'count без сдвига фазы {count/len(decision_direct) * 100}% символов совпадают')    
+                
+                # Определяем количество сдвигов в зависимости от констелляции
+                if self.constellation == 'qpsk':
+                    num_phases = 4  # Для QPSK проверяем 0, 90, 180, 270 градусов
+                    phase_step = np.pi / 2
+                elif self.constellation == '8psk':
+                    num_phases = 8
+                    phase_step = np.pi / 4
+                elif self.constellation == '16psk':
+                    num_phases = 16
+                    phase_step = np.pi / 8
                 else:
-                    for phase in range (16):
-                        count = 0
-                        for i in range(len(decision_direct)):
-                            decision_direct[i] = decision_direct[i] * np.exp(1j * 2 * np.pi / 16)
-                            if decision_direct[i] == self.packet_symb[i]:
-                                count += 1
-                        if count/len(decision_direct) >= 0.5:
-                            print(f'пакет принят, {count/len(decision_direct) * 100}% символов совпадают, сдвиг фазы: {(phase + 1) * 22.5} градусов')
+                    num_phases = 16  # По умолчанию
+                    phase_step = 2 * np.pi / 16
+                
+                for phase in range(num_phases):
+                    print(f'проверка сдвига фазы {phase}')
+                    count = 0
+                    # Применяем сдвиг к исходному массиву, а не к уже измененному
+                    phase_shift = np.exp(1j * phase_step * phase)
+                    for i in range(len(decision_direct)):
+                        shifted_symbol = decision_original[i] * phase_shift
+                        # Используем сравнение с допуском
+                        if np.isclose(shifted_symbol, self.packet_symb[i], rtol=1e-5, atol=1e-5):
+                            count += 1
+                    
+                    phase_deg = np.degrees(phase_step * phase)
+                    print(f'count, {count/len(decision_direct) * 100}% символов совпадают, сдвиг фазы: {phase_deg} градусов')
                         
         
-    def filter_samples(samples, sps):
+    def filter_samples(self, samples):
+        sps = self.sps
         rrc = rrc_filter(sps, 10, 0.35)
         samples = np.convolve(samples, rrc, mode='same')
         samples = samples / np.std(samples)
@@ -223,7 +271,10 @@ class Processing:
         conv_results, conv_results_interp = self.find_preamble_offset_with_interpolate_dots(self.signal, self.preamble, self.sps, self.interp)
         peaks = self.find_conv_peaks(conv_results, conv_results_interp, self.interp)
 
+        finded_siganls = []
+
         for peak in peaks:
+            # ошибка, исправить условие
             if conv_results_interp:
                 signal_iq = array_shift(self.signal, shift=0.5, mode='nearest')
                 offset = (peak - 1) // 2
@@ -241,16 +292,49 @@ class Processing:
             phase_diffs = np.diff((np.unwrap(phases)))
             avg_phase_diff = np.mean(phase_diffs)
             f_rel = avg_phase_diff / (2 * np.pi * self.sps)
+            print(f'f_rel {f_rel}')
             shiftted_signal = signal_cutted.copy()
+            
             shiftted_signal = shiftted_signal * np.exp(-1j * 2 * np.pi * f_rel * (np.arange(len(shiftted_signal)) + offset))
-            filtred_signal = self.filter_samples(shiftted_signal, self.sps)
+            filtred_signal = self.filter_samples(shiftted_signal)
+            # analys.plot_constellation(filtred_signal, 4)
             recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, self.sps, alpha=0.007, mu_initial=0.0)
-            signal_list, curr_freq, curr_freq_list, ef_n_list = self.fll_func(recovered, Bn = 0.012)
+            # analys.plot_constellation(recovered, 1)
+           
+            signal_list, curr_freq, curr_freq_list, ef_n_list = self.fll_func(recovered, Bn = 0.03)
+            
+            # fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+
+            # # Созвездие сигналов после FLL
+            # axs[0].plot(signal_list[500:].real, signal_list[500:].imag, 'o', markersize=3, alpha=0.6)
+            # axs[0].set_title("Созвездие после FLL")
+            # axs[0].set_xlabel('I (Real)')
+            # axs[0].set_ylabel('Q (Imag)')
+            # axs[0].grid(True, alpha=0.3)
+            # axs[0].axis('equal')
+
+            # # Текущая накопленная оценка частоты (вектор по времени)
+            # axs[1].plot(curr_freq_list)
+            # axs[1].set_title("curr_freq (после FLL)")
+            # axs[1].set_xlabel('n')
+            # axs[1].set_ylabel('curr_freq')
+
+            # # Эфф. изменение частоты во времени
+            # axs[2].plot(ef_n_list)
+            # axs[2].set_title("Эфф. изменение частоты (ef_n_list)")
+            # axs[2].set_xlabel('n')
+            # axs[2].set_ylabel('ef_n')
+
+            # plt.tight_layout()
+            # plt.show()
+
+            finded_siganls.append(signal_list)
+            self.decision_direct(signal_list)
+            
+        print(peaks)
             
             
-            
-            
-        return peaks
+        return peaks, finded_siganls
 
 class Generation:
     def __init__(self, constellation, preamble_length, signal_length, sps, Frel, Noise_power, N, Delay):
@@ -268,7 +352,7 @@ class Generation:
         samples, symbols = self.generate_signal(preamble)
         # print(f"samples: {samples}")
         samples = self.upsample(samples)
-        # samples = self.filter_samples(samples)
+        samples = self.filter_samples(samples)
         samples = self.frequency_offset(samples)
         samples = self.add_noise(samples)
         return preamble, samples, symbols
@@ -277,7 +361,7 @@ class Generation:
         if self.constellation == 'bpsk':
             preamble = np.random.choice([-1 + 0j, 1 + 0j], size=self.preamble_length)
         elif self.constellation == 'qpsk':
-            preamble = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707], size=self.preamble_length)
+            preamble = np.random.choice([(1+ 1j)/np.sqrt(2), (1 - 1j)/np.sqrt(2), (-1 + 1j)/np.sqrt(2), (-1 - 1j)/np.sqrt(2)], size=self.preamble_length)
         elif self.constellation == '8psk':
             preamble = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707, 0 + 1j, 0 - 1j, 1 + 0j, -1 + 0j], size=self.preamble_length)
         elif self.constellation == '16psk':
@@ -286,7 +370,10 @@ class Generation:
              np.exp(9j*np.pi/8), np.exp(10j*np.pi/8), np.exp(11j*np.pi/8), np.exp(12j*np.pi/8), np.exp(13j*np.pi/8), 
              np.exp(14j*np.pi/8), np.exp(15j*np.pi/8), np.exp(16j*np.pi/8)], size=self.preamble_length)
         elif self.constellation == '16apsk':
-             preamble = np.random.choice(0.5 * np.exp(1j * (np.pi/4 +  np.arange(4) * np.pi/2)), 1 * np.exp(1j * (np.pi/4 + np.arange(12) * np.pi/6)), size=self.preamble_length)
+             inner_ring = 0.5 * np.exp(1j * (np.pi/4 + np.arange(4) * np.pi/2))
+             outer_ring = 1 * np.exp(1j * (np.pi/4 + np.arange(12) * np.pi/6))
+             constellation_points = np.concatenate([inner_ring, outer_ring])
+             preamble = np.random.choice(constellation_points, size=self.preamble_length)
         else:
             raise ValueError(f"Неподдерживаемая констелляция: {self.constellation}")
         return preamble
@@ -297,14 +384,17 @@ class Generation:
         elif self.constellation == 'qpsk':
             inform = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707], size=self.signal_length - self.preamble_length)
         elif self.constellation == '8psk':
-            inform = np.random.choice([0.707 + 1j*0.707, 0.707 - 1j*0.707, -0.707 + 1j*0.707, -0.707 - 1j*0.707, 0 + 1j, 0 - 1j, 1 + 0j, -1 + 0j], size=self.signal_length - self.preamble_length)
+            inform = np.random.choice(np.exp(1j * (np.pi/4 * np.arange(8) - np.pi)), size=self.signal_length - self.preamble_length)
         elif self.constellation == '16psk': 
              inform = np.random.choice([np.exp(1j*np.pi/8), np.exp(2j*np.pi/8), np.exp(3j*np.pi/8),
             np.exp(4j*np.pi/8), np.exp(5j*np.pi/8), np.exp(6j*np.pi/8), np.exp(7j*np.pi/8), np.exp(8j*np.pi/8),
              np.exp(9j*np.pi/8), np.exp(10j*np.pi/8), np.exp(11j*np.pi/8), np.exp(12j*np.pi/8), np.exp(13j*np.pi/8), 
              np.exp(14j*np.pi/8), np.exp(15j*np.pi/8), np.exp(16j*np.pi/8)], size=self.signal_length - self.preamble_length)
         elif self.constellation == '16apsk':
-             inform = np.random.choice(0.5 * np.exp(1j * (np.pi/4 +  np.arange(4) * np.pi/2)), 1 * np.exp(1j * (np.pi/12 + np.arange(12) * np.pi/6)), size=self.signal_length - self.preamble_length)
+             inner_ring = 0.5 * np.exp(1j * (np.pi/4 + np.arange(4) * np.pi/2))
+             outer_ring = 1 * np.exp(1j * (np.pi/12 + np.arange(12) * np.pi/6))
+             constellation_points = np.concatenate([inner_ring, outer_ring])
+             inform = np.random.choice(constellation_points, size=self.signal_length - self.preamble_length)
         else:
             raise ValueError(f"Неподдерживаемая констелляция: {self.constellation}")
 

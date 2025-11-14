@@ -160,17 +160,15 @@ pre = generate_preamb(L=300)
 # print(type(pre))
 
 pack = gen_packets(pre, 2000)
-print(len(pack))
 
 symbols = gen_packet_symbols(pack, 5, 30)
 samples = gen_samples(symbols, sps)
 samples = filter_samples(samples, sps)
-samples = frequency_offset(samples, 0.01126302)
+# samples = frequency_offset(samples, 0.01126302)
 
-print(len(samples))
-samples = array_shift(samples, shift=0.612, mode='nearest')
-print(len(samples))
-samples = add_noise(samples, 0.6)
+# samples = array_shift(samples, shift=0.612, mode='nearest')
+
+# samples = add_noise(samples, 0.6)
 
 
 
@@ -179,6 +177,8 @@ samples = add_noise(samples, 0.6)
 # samples = array_shift(samples, shift=-np.mean(mu_history[-100:]), mode='nearest')
 
 # analys.plot_signal(samples)
+print(len(samples))
+analys.plot_signal(samples)
 analys.plot_constellation(samples, 4)
 
 # print(len(recovered))
@@ -252,6 +252,7 @@ for peak in peaks:
     phase_diffs = np.diff((np.unwrap(phases)))
     avg_phase_diff = np.mean(phase_diffs)
     f_rel_method1 = avg_phase_diff / (2 * np.pi * sps)
+    print(f'f_rel {f_rel_method1}')
     f_rel_list.append(f_rel_method1)
     for f_rel in [f_rel_method1]:
         shiftted_signal = signal_cutted.copy()
@@ -264,6 +265,7 @@ for peak in peaks:
 
         recovered, timing_errors, mu_history = gardner_timing_recovery(filtred_signal, sps, alpha=0.007, mu_initial=0.0)
         # print(f'длина сигнала в отсчетах после Гарднера: {len(recovered)}')
+        analys.plot_constellation(recovered, 1)
         signal_list, curr_freq, curr_freq_list, ef_n_list = fll_func(recovered, Bn = 0.012)
         # print(f'длина сигнала в отсчетах после FLL: {len(signal_list)}')
         fig, axs = plt.subplots(1, 3, figsize=(18, 5))
